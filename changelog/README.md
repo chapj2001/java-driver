@@ -4,6 +4,7 @@
 
 ### 4.3.0 (in progress)
 
+- [bug] JAVA-2464: Fix initial schema refresh when reconnect-on-init is enabled
 - [improvement] JAVA-2402: Add setTracing(boolean) to StatementBuilder
 
 ### 4.2.1
