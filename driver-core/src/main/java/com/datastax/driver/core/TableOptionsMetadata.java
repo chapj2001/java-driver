@@ -79,6 +79,7 @@ public class TableOptionsMetadata {
   private final Double crcCheckChance;
   private final Map<String, ByteBuffer> extensions;
   private final boolean cdc;
+  private final boolean cdcValid;
 
   TableOptionsMetadata(Row row, boolean isCompactStorage, VersionNumber version) {
 
@@ -86,7 +87,6 @@ public class TableOptionsMetadata {
     boolean is200 = version.getMajor() == 2 && version.getMinor() == 0;
     boolean is210 = version.getMajor() == 2 && version.getMinor() >= 1;
     boolean is400OrHigher = version.getMajor() > 3;
-    boolean is380OrHigher = is400OrHigher || version.getMajor() == 3 && version.getMinor() >= 8;
     boolean is300OrHigher = version.getMajor() > 2;
     boolean is210OrHigher = is210 || is300OrHigher;
 
@@ -174,8 +174,13 @@ public class TableOptionsMetadata {
       this.extensions = ImmutableMap.copyOf(row.getMap(EXTENSIONS, String.class, ByteBuffer.class));
     else this.extensions = ImmutableMap.of();
 
-    if (is380OrHigher) this.cdc = isNullOrAbsent(row, CDC) ? DEFAULT_CDC : row.getBool(CDC);
-    else this.cdc = DEFAULT_CDC;
+    if (isNullOrAbsent(row, CDC)) {
+      this.cdc = DEFAULT_CDC;
+      this.cdcValid = false;
+    } else {
+      this.cdc = row.getBool(CDC);
+      this.cdcValid = true;
+    }
   }
 
   private static boolean isNullOrAbsent(Row row, String name) {
@@ -386,14 +391,42 @@ public class TableOptionsMetadata {
   }
 
   /**
-   * Returns whether or not change data capture is enabled for this table.
+   * Returns whether or not change data capture (CDC) is enabled for this table. See {@link
+   * #isCDCValid()} to determine whether this value is the default or was explicitly passed by C*
+   * response.
    *
-   * <p>For Cassandra versions prior to 3.8.0, this method always returns false.
+   * <p>Note that Apache Cassandra officially introduced CDC via CASSANDRA-12041 in Cassandra 3.8.0.
+   * So older versions of Cassandra will always return false unless running a custom variant which
+   * back-ports CDC.
    *
-   * @return whether or not change data capture is enabled for this table.
+   * @return whether or not change data capture (CDC) is enabled for this table.
    */
   public boolean isCDC() {
     return cdc;
+  }
+
+  /**
+   * Defines whether {@link #isCDC()} returns default or value explicitly set by C* response.
+   *
+   * <ul>
+   *   <li>When C* server is configured with cdc_enabled:false (default)
+   *       <ul>
+   *         <li>C* silently ignores "WITH cdc" option for new table creation
+   *         <li>C* applies no CDC option when CDC is not explicitly set for new table creation
+   *       </ul>
+   *   <li>When C* server is configured with cdc_enabled:true
+   *       <ul>
+   *         <li>C* applies explicitly-set "WITH cdc" option for new table creation
+   *         <li>C* applies "WITH cdc=false" when CDC is not explicitly set for new table creation
+   *       </ul>
+   * </ul>
+   *
+   * Table metadata always includes CDC option C* used for tables created while cdc_enabled:true
+   *
+   * @return true if {@link #isCDC()} was explicitly set by server response
+   */
+  public boolean isCDCValid() {
+    return cdcValid;
   }
 
   @Override

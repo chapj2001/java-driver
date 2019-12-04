@@ -300,8 +300,7 @@ public abstract class AbstractTableMetadata {
     if (cassandraVersion.getMajor() > 2) {
       and(sb, formatted).append("crc_check_chance = ").append(options.getCrcCheckChance());
     }
-    if (cassandraVersion.getMajor() > 3
-        || (cassandraVersion.getMajor() == 3 && cassandraVersion.getMinor() >= 8)) {
+    if (options.isCDCValid()) {
       and(sb, formatted).append("cdc = ").append(options.isCDC());
     }
     if (cassandraVersion.getMajor() > 1) {
